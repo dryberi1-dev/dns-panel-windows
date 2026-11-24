@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -7,6 +8,7 @@ using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
+using System.Windows;
 using Microsoft.Win32;
 
 namespace DnsPanel;
@@ -92,7 +94,7 @@ internal static class WindowsDns
         }
         catch (Exception error)
         {
-            MessageBox.Show(error.Message, "DNS-пульт", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(error.Message, "DNS-пульт", MessageBoxButton.OK, MessageBoxImage.Warning);
             return 1;
         }
     }

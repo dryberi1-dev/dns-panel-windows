@@ -2,11 +2,16 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
-    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>DNS-Panel-Windows</AssemblyName>
-    <Version>1.0.1</Version>
+    <Version>1.1.0</Version>
+    <ApplicationIcon>DnsPanel.ico</ApplicationIcon>
     <Description>DNS-пульт для Windows</Description>
   </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="DnsPanel.ico" />
+    <Resource Include="logo.png" />
+  </ItemGroup>
 </Project>

@@ -1,5 +1,7 @@
+using System.IO;
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Windows;
 using Microsoft.Win32;
 
 namespace DnsPanel;
@@ -23,9 +25,7 @@ internal static class Program
         if (args.Length > 0)
             return WindowsDns.RunWorker(args);
 
-        ApplicationConfiguration.Initialize();
-        Application.Run(new MainForm());
-        return 0;
+        return new Application { ShutdownMode = ShutdownMode.OnMainWindowClose }.Run(new MainForm());
     }
 
     internal static NetworkInterface[] Adapters() => NetworkInterface.GetAllNetworkInterfaces()

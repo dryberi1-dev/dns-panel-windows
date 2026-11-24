@@ -116,7 +116,7 @@ internal static class WindowsDns
                 .Where(address => IsV6(address) == family.IsV6).Take(4).ToArray();
             if (addresses.Length == 0)
                 return backup?.Original[index] ?? family;
-            return new Family(family.IsV6, false, string.Join(", ", addresses.Select(address => address.ToString())),
+            return new Family(family.IsV6, false, string.Join(",", addresses.Select(address => address.ToString())),
                 addresses.Select((_, index) => new DohServer((uint)index, reading.Profile.Endpoint.AbsoluteUri, DohEnabled)).ToArray(),
                 family.Registration);
         }).ToArray();

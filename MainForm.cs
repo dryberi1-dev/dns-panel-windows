@@ -6,6 +6,8 @@ using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -17,13 +19,16 @@ internal partial class MainForm : Window
     private readonly CancellationTokenSource _lifetime = new();
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMinutes(1) };
     private readonly ObservableCollection<ProfileRow> _rows;
-    private readonly (ContentControl Card, WebService Service)[] _serviceCards;
+    private readonly ICollectionView _profileView;
+    private readonly (ContentControl Card, WebService Service, ToggleButton Filter)[] _serviceCards;
     private CancellationTokenSource? _refresh;
     private CancellationTokenSource? _serviceCheck;
-    private Dictionary<Profile, Task<Reading>>? _readings;
+    private CancellationTokenSource? _filterCheck;
+    private ServiceScan? _scan;
     private bool _ready;
     private bool _working;
     private bool _loadingAdapters;
+    private bool _changingFilter;
     private ThemeChoice _theme;
     private bool? _dark;
     private HwndSource? _windowSource;
@@ -43,15 +48,16 @@ internal partial class MainForm : Window
         ThemePicker.SelectedItem = Themes.Single(option => option.Choice == _theme);
         UpdateTheme();
         _rows = new ObservableCollection<ProfileRow>(DnsProfiles.All.Select(profile => new ProfileRow(profile)));
-        ProfileList.ItemsSource = _rows;
+        _profileView = CollectionViewSource.GetDefaultView(_rows);
+        ProfileList.ItemsSource = _profileView;
         ProfileList.SelectedItem = _rows[1];
         _serviceCards =
         [
-            (ChatCard, ServiceProbe.ChatGpt),
-            (GeminiCard, ServiceProbe.Gemini),
-            (ClaudeCard, ServiceProbe.Claude)
+            (ChatCard, ServiceProbe.ChatGpt, ChatFilter),
+            (GeminiCard, ServiceProbe.Gemini, GeminiFilter),
+            (ClaudeCard, ServiceProbe.Claude, ClaudeFilter)
         ];
-        foreach (var (card, service) in _serviceCards)
+        foreach (var (card, service, _) in _serviceCards)
             ShowService(card, service, Waiting("Ожидание", "Проверка начнётся после запуска."));
         SourceInitialized += (_, _) =>
         {
@@ -70,7 +76,7 @@ internal partial class MainForm : Window
         {
             if (_theme == ThemeChoice.System)
                 UpdateTheme();
-            if (!_working && _refresh is null)
+            if (!_working && _refresh is null && _filterCheck is null)
                 await RefreshAsync();
         };
         Closed += (_, _) =>
@@ -79,6 +85,7 @@ internal partial class MainForm : Window
             if (_windowSource is { IsDisposed: false })
                 _windowSource.RemoveHook(ThemeMessage);
             _lifetime.Cancel();
+            _scan?.Dispose();
         };
     }
 
@@ -114,22 +121,16 @@ internal partial class MainForm : Window
         LoadAdapters();
         var adapter = SelectedAdapter;
         var connected = adapter is not null && Program.Connected(adapter);
+        _scan?.Dispose();
+        _scan = connected ? new ServiceScan(adapter!, _lifetime.Token) : null;
         UpdateControls(adapter);
 
         try
         {
             foreach (var row in _rows)
                 row.Set(connected ? "Проверка…" : "Нет сети", ServiceState.Waiting);
-            var readings = connected
-                ? _rows.ToDictionary(row => row.Profile, row => DnsProfiles.Check(row.Profile, refresh.Token, adapter))
-                : null;
-            _readings = readings;
-            if (readings is null)
-            {
-                await InspectServicesAsync();
-                return;
-            }
-            await Task.WhenAll(RefreshOrderAsync(readings, refresh.Token), InspectServicesAsync());
+            var reorder = _scan is { } scan ? RefreshOrderAsync(scan.Readings, refresh.Token) : Task.CompletedTask;
+            await Task.WhenAll(reorder, InspectServicesAsync(), RefreshFiltersAsync());
         }
         catch (OperationCanceledException) when (refresh.IsCancellationRequested)
         {
@@ -145,7 +146,7 @@ internal partial class MainForm : Window
         }
     }
 
-    private async Task RefreshOrderAsync(Dictionary<Profile, Task<Reading>> readings, CancellationToken token)
+    private async Task RefreshOrderAsync(IReadOnlyDictionary<Profile, Task<Reading>> readings, CancellationToken token)
     {
         await Task.WhenAll(_rows.Select(row => PaintAsync(readings[row.Profile], row, token)));
         token.ThrowIfCancellationRequested();
@@ -168,32 +169,119 @@ internal partial class MainForm : Window
             row.Set(reading.Status, ServiceState.Unreachable);
     }
 
+    private async Task RefreshFiltersAsync()
+    {
+        _filterCheck?.Cancel();
+        var services = _serviceCards.Where(item => item.Filter.IsChecked == true).Select(item => item.Service).ToArray();
+        if (services.Length == 0)
+        {
+            _filterCheck = null;
+            FilterStatus.Visibility = Visibility.Collapsed;
+            var changed = ShowMatches(null);
+            UpdateControls(SelectedAdapter);
+            if (changed)
+                await InspectServicesAsync();
+            return;
+        }
+
+        using var filter = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _filterCheck = filter;
+        FilterStatus.Visibility = Visibility.Visible;
+        FilterStatus.Text = "Проверяем выбранные сервисы…";
+        UpdateControls(SelectedAdapter);
+
+        var selectionChanged = false;
+        try
+        {
+            var matches = new HashSet<Profile>();
+            if (_scan is { } scan)
+            {
+                var checks = _rows.Select(async row =>
+                {
+                    var results = await Task.WhenAll(services.Select(service => scan.CheckAsync(row.Profile, service)));
+                    return (row.Profile, Matches: results.All(result => result.State == ServiceState.Reachable));
+                }).ToArray();
+                var results = await Task.WhenAll(checks).WaitAsync(filter.Token);
+                filter.Token.ThrowIfCancellationRequested();
+                matches.UnionWith(results.Where(result => result.Matches).Select(result => result.Profile));
+                FilterStatus.Text = matches.Count == 0
+                    ? "Ни один DNS не прошёл все проверки."
+                    : $"Подходит {matches.Count} из {_rows.Count}";
+            }
+            else
+            {
+                FilterStatus.Text = "Подключитесь к сети для проверки.";
+            }
+            selectionChanged = ShowMatches(matches);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            if (ReferenceEquals(_filterCheck, filter))
+            {
+                _filterCheck = null;
+                if (!_lifetime.IsCancellationRequested)
+                    UpdateControls(SelectedAdapter);
+            }
+        }
+
+        if (selectionChanged && !_lifetime.IsCancellationRequested)
+            await InspectServicesAsync();
+    }
+
+    private bool ShowMatches(HashSet<Profile>? matches)
+    {
+        if (matches is null && _profileView.Filter is null)
+            return false;
+
+        var previous = ProfileList.SelectedItem as ProfileRow;
+        _changingFilter = true;
+        try
+        {
+            _profileView.Filter = matches is null ? null : item => item is ProfileRow row && matches.Contains(row.Profile);
+            ProfileList.SelectedItem = previous is not null && _profileView.Contains(previous)
+                ? previous : _profileView.Cast<ProfileRow>().FirstOrDefault();
+        }
+        finally
+        {
+            _changingFilter = false;
+        }
+        return !ReferenceEquals(previous, ProfileList.SelectedItem);
+    }
+
     private async Task InspectServicesAsync()
     {
         _serviceCheck?.Cancel();
-        if (ProfileList.SelectedItem is not ProfileRow row)
+        var row = ProfileList.SelectedItem as ProfileRow;
+        ServiceCards.Visibility = row is null ? Visibility.Collapsed : Visibility.Visible;
+        ApplyButton.Visibility = ServiceCards.Visibility;
+        if (row is null)
+        {
+            ProfileTitle.Text = "Нет подходящих DNS";
+            ProfileHost.Text = "Снимите один из фильтров или повторите проверку.";
             return;
+        }
 
         ProfileTitle.Text = row.Name;
         ProfileHost.Text = row.Host;
         using var check = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         _serviceCheck = check;
-        var adapter = SelectedAdapter;
-        var pending = _readings?.GetValueOrDefault(row.Profile);
-        var status = pending is null
+        var scan = _scan;
+        var status = scan is null
             ? Waiting("Нет сети", "Подключите сетевой адаптер для проверки.")
             : Waiting("Проверка…", $"Проверяем сайт через {row.Name}.");
-        foreach (var (card, service) in _serviceCards)
+        foreach (var (card, service, _) in _serviceCards)
             ShowService(card, service, status);
 
         try
         {
-            if (pending is not null)
+            if (scan is not null)
             {
                 await Task.Delay(120, check.Token);
-                var reading = await pending.WaitAsync(check.Token);
                 await Task.WhenAll(_serviceCards.Select(item =>
-                    CheckCardAsync(item.Card, item.Service, reading, adapter, check.Token)));
+                    CheckCardAsync(item.Card, item.Service, scan, row.Profile, check.Token)));
             }
         }
         catch (OperationCanceledException)
@@ -206,10 +294,9 @@ internal partial class MainForm : Window
         }
     }
 
-    private async Task CheckCardAsync(ContentControl card, WebService service, Reading reading, NetworkInterface? adapter,
-        CancellationToken token)
+    private async Task CheckCardAsync(ContentControl card, WebService service, ServiceScan scan, Profile profile, CancellationToken token)
     {
-        var result = await ServiceProbe.CheckAsync(service, reading, adapter, token);
+        var result = await scan.CheckAsync(profile, service).WaitAsync(token);
         token.ThrowIfCancellationRequested();
         ShowService(card, service, result);
     }
@@ -225,28 +312,25 @@ internal partial class MainForm : Window
         card.Content = new ServiceCardData(service.Name, Geometry.Parse(glyph), result.Status, result.Detail, result.State);
     }
 
-    private async Task ChangeAsync(bool restore, Profile? profile = null)
+    private async Task ChangeAsync(Profile? profile)
     {
         var adapter = SelectedAdapter;
         if (adapter is null || _working)
             return;
+        var restore = profile is null;
         _working = true;
         SetAction(restore ? "Восстанавливаем настройки…" : "Проверяем DNS перед применением…");
         UpdateControls(adapter);
         try
         {
-            if (!restore)
+            if (profile is not null)
             {
-                var candidates = profile is null ? DnsProfiles.All : [profile];
-                var readings = await Task.WhenAll(candidates.Select(item => DnsProfiles.Check(item, _lifetime.Token, adapter)));
-                var selected = readings.Where(reading => reading.Milliseconds.HasValue).MinBy(reading => reading.Milliseconds);
-                if (selected is null)
+                var reading = await DnsProfiles.Check(profile, _lifetime.Token, adapter);
+                if (!reading.Milliseconds.HasValue)
                 {
                     SetAction("DNS не ответил. Выберите другой профиль или проверьте подключение.", "Negative");
                     return;
                 }
-                profile = selected.Profile;
-                ProfileList.SelectedItem = _rows.First(row => row.Profile == profile);
                 SetAction($"{profile.Name} · подтвердите изменение DNS в окне Windows.");
             }
             else
@@ -292,8 +376,10 @@ internal partial class MainForm : Window
     {
         AdapterPicker.IsEnabled = !_working && AdapterPicker.Items.Count > 0;
         ProfileList.IsEnabled = !_working;
-        ApplyButton.IsEnabled = !_working && adapter is not null && Program.Connected(adapter);
-        AutoButton.IsEnabled = ApplyButton.IsEnabled;
+        foreach (var (_, _, filter) in _serviceCards)
+            filter.IsEnabled = !_working;
+        ApplyButton.IsEnabled = !_working && _filterCheck is null && ProfileList.SelectedItem is ProfileRow &&
+            adapter is not null && Program.Connected(adapter);
         RestoreButton.IsEnabled = !_working && adapter is not null && WindowsDns.HasBackup(Guid.Parse(adapter.Id));
         RefreshButton.IsEnabled = !_working && _refresh is null;
         var addresses = adapter?.GetIPProperties().DnsAddresses;
@@ -311,13 +397,24 @@ internal partial class MainForm : Window
     }
 
     private async void RefreshClicked(object sender, RoutedEventArgs e) => await RefreshAsync();
-    private async void ApplyClicked(object sender, RoutedEventArgs e) => await ChangeAsync(false, (ProfileList.SelectedItem as ProfileRow)?.Profile);
-    private async void AutoClicked(object sender, RoutedEventArgs e) => await ChangeAsync(false);
-    private async void RestoreClicked(object sender, RoutedEventArgs e) => await ChangeAsync(true);
-    private async void ProfileChanged(object sender, SelectionChangedEventArgs e)
+    private async void ApplyClicked(object sender, RoutedEventArgs e)
+    {
+        if (ProfileList.SelectedItem is ProfileRow row)
+            await ChangeAsync(row.Profile);
+    }
+    private async void RestoreClicked(object sender, RoutedEventArgs e) => await ChangeAsync(null);
+    private async void ServiceFilterChanged(object sender, RoutedEventArgs e)
     {
         if (_ready)
+            await RefreshFiltersAsync();
+    }
+    private async void ProfileChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_ready && !_changingFilter)
+        {
+            UpdateControls(SelectedAdapter);
             await InspectServicesAsync();
+        }
     }
     private async void AdapterChanged(object sender, SelectionChangedEventArgs e)
     {

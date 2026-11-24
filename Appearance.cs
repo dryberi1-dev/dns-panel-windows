@@ -38,8 +38,6 @@ internal static class Appearance
         ("IconFill", 0xECF5F0, 0x293D34),
         ("HeroInk", 0xF1FFF9, 0xF1FFF9),
         ("HeroMuted", 0xC7E4D7, 0xC4DBD1),
-        ("HeroButtonFill", 0x204C43, 0x253E36),
-        ("HeroButtonLine", 0x53766B, 0x59796D),
         ("HeroTrace", 0x9CF2CC, 0x90DAB8)
     ];
 

@@ -15,6 +15,7 @@ internal static class ServiceProbe
 {
     public static readonly WebService ChatGpt = new("ChatGPT", new Uri("https://chatgpt.com/"));
     public static readonly WebService Gemini = new("Gemini", new Uri("https://gemini.google.com/"));
+    public static readonly WebService Claude = new("Claude", new Uri("https://claude.ai/new"));
 
     public static async Task<ServiceResult> CheckAsync(WebService service, Reading reading,
         NetworkInterface? adapter, CancellationToken cancellationToken)

@@ -25,7 +25,11 @@ internal static class DnsProfiles
         new("GeoHide EU", "eu.geohide.ru"),
         new("GeoHide US", "us.geohide.ru"),
         new("Wlrus", "dns.wlrus.cfd"),
-        new("Безмежа", "dns.bezmezhau.com")
+        new("Безмежа", "dns.bezmezhau.com"),
+        new("Comss.one", "dns.comss.one"),
+        new("Geodema", "dns.geodema.love"),
+        new("Перевал", "pereval.portbuddy.tech"),
+        new("GeoHide RU", "geohide.ru")
     ];
 
     internal static Dictionary<AddressFamily, IPAddress>? LocalAddresses(NetworkInterface? adapter) =>

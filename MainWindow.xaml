@@ -3,26 +3,58 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="DNS-пульт" Icon="DnsPanel.ico"
         Width="1000" Height="720" MinWidth="840" MinHeight="635"
-        WindowStartupLocation="CenterScreen" Background="#F0F5F2"
+        WindowStartupLocation="CenterScreen" Background="{DynamicResource Canvas}"
         FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="14"
-        Foreground="#1B3028" UseLayoutRounding="True" SnapsToDevicePixels="True">
+        Foreground="{DynamicResource Ink}" UseLayoutRounding="True" SnapsToDevicePixels="True">
     <Window.Resources>
-        <SolidColorBrush x:Key="Ink" Color="#1B3028"/>
-        <SolidColorBrush x:Key="Muted" Color="#52675E"/>
-        <SolidColorBrush x:Key="Line" Color="#DAE5DE"/>
-        <SolidColorBrush x:Key="Accent" Color="#9BF0CA"/>
-        <SolidColorBrush x:Key="Positive" Color="#146B4E"/>
-        <SolidColorBrush x:Key="PositiveFill" Color="#E6F6EE"/>
-        <SolidColorBrush x:Key="Caution" Color="#815316"/>
-        <SolidColorBrush x:Key="CautionFill" Color="#FFF2D7"/>
-        <SolidColorBrush x:Key="Negative" Color="#9C3F3C"/>
-        <SolidColorBrush x:Key="NegativeFill" Color="#FAECEA"/>
-        <SolidColorBrush x:Key="Waiting" Color="#52675E"/>
-        <SolidColorBrush x:Key="WaitingFill" Color="#EDF2EF"/>
+        <Style TargetType="ToolTip">
+            <Setter Property="Background" Value="{DynamicResource Surface}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Line}"/>
+            <Setter Property="Padding" Value="8,5"/>
+        </Style>
+        <Style x:Key="ScrollPage" TargetType="RepeatButton">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton"><Border Background="Transparent"/></ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="ScrollBar">
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Vertical">
+                    <Setter Property="Width" Value="10"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ScrollBar">
+                                <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                    <Track.DecreaseRepeatButton>
+                                        <RepeatButton Style="{StaticResource ScrollPage}" Command="{x:Static ScrollBar.PageUpCommand}"/>
+                                    </Track.DecreaseRepeatButton>
+                                    <Track.Thumb>
+                                        <Thumb>
+                                            <Thumb.Template>
+                                                <ControlTemplate TargetType="Thumb">
+                                                    <Border Background="{DynamicResource ScrollThumb}" CornerRadius="3" Margin="3,1,1,1"/>
+                                                </ControlTemplate>
+                                            </Thumb.Template>
+                                        </Thumb>
+                                    </Track.Thumb>
+                                    <Track.IncreaseRepeatButton>
+                                        <RepeatButton Style="{StaticResource ScrollPage}" Command="{x:Static ScrollBar.PageDownCommand}"/>
+                                    </Track.IncreaseRepeatButton>
+                                </Track>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
         <Style x:Key="ButtonBase" TargetType="Button">
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="Foreground" Value="{StaticResource Ink}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+            <Setter Property="Background" Value="{DynamicResource Surface}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Line}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Padding" Value="15,0"/>
@@ -39,7 +71,7 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Opacity" Value=".83"/></Trigger>
                             <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Opacity" Value=".67"/></Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="#328B69"/></Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{DynamicResource Focus}"/></Trigger>
                             <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Surface" Property="Opacity" Value=".62"/></Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -47,18 +79,19 @@
             </Setter>
         </Style>
         <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
-            <Setter Property="Background" Value="{StaticResource Accent}"/>
-            <Setter Property="Foreground" Value="#102C22"/>
+            <Setter Property="Background" Value="{DynamicResource Accent}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentInk}"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="MinHeight" Value="42"/>
         </Style>
         <Style x:Key="HeroButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
-            <Setter Property="Background" Value="#204C43"/>
-            <Setter Property="Foreground" Value="#F4FFF9"/>
-            <Setter Property="BorderBrush" Value="#53766B"/>
+            <Setter Property="Background" Value="{DynamicResource HeroButtonFill}"/>
+            <Setter Property="Foreground" Value="{DynamicResource HeroInk}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource HeroButtonLine}"/>
             <Setter Property="MinHeight" Value="42"/>
         </Style>
         <Style x:Key="ProfileItem" TargetType="ListBoxItem">
+            <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="Padding" Value="10,4"/>
             <Setter Property="Margin" Value="0,1,0,1"/>
@@ -72,25 +105,40 @@
                             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Row" Property="Background" Value="#F0F6F2"/></Trigger>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Row" Property="Background" Value="{DynamicResource Hover}"/></Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Row" Property="Background" Value="#E0F2E9"/>
-                                <Setter TargetName="Row" Property="BorderBrush" Value="#BEE4D3"/>
+                                <Setter TargetName="Row" Property="Background" Value="{DynamicResource Selection}"/>
+                                <Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource SelectionLine}"/>
                             </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Row" Property="BorderBrush" Value="#419477"/></Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource Focus}"/></Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
-        <Style x:Key="AdapterCombo" TargetType="ComboBox">
-            <Setter Property="Foreground" Value="{StaticResource Ink}"/>
+        <Style x:Key="Picker" TargetType="ComboBox">
+            <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
             <Setter Property="MinWidth" Value="143"/>
             <Setter Property="MaxWidth" Value="250"/>
             <Setter Property="Height" Value="36"/>
             <Setter Property="ItemContainerStyle">
                 <Setter.Value>
-                    <Style TargetType="ComboBoxItem"><Setter Property="Padding" Value="9,6"/></Style>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ComboBoxItem">
+                                    <Border x:Name="Option" Background="Transparent" Padding="9,6" CornerRadius="6">
+                                        <ContentPresenter/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsSelected" Value="True"><Setter TargetName="Option" Property="Background" Value="{DynamicResource Selection}"/></Trigger>
+                                        <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Option" Property="Background" Value="{DynamicResource Hover}"/></Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
                 </Setter.Value>
             </Setter>
             <Setter Property="Template">
@@ -101,14 +149,14 @@
                                           Focusable="False" ClickMode="Press" Cursor="Hand">
                                 <ToggleButton.Template>
                                     <ControlTemplate TargetType="ToggleButton">
-                                        <Border x:Name="Chip" Background="White" BorderBrush="#D5E4DB" BorderThickness="1" CornerRadius="10">
-                                            <Path Data="M 1 1 L 5 5 L 9 1" Stroke="#4B685C" StrokeThickness="1.6"
+                                        <Border x:Name="Chip" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="10">
+                                            <Path Data="M 1 1 L 5 5 L 9 1" Stroke="{DynamicResource Muted}" StrokeThickness="1.6"
                                                   StrokeStartLineCap="Round" StrokeEndLineCap="Round"
                                                   HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,11,0"/>
                                         </Border>
                                         <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chip" Property="Background" Value="#E8F6EE"/></Trigger>
-                                            <Trigger Property="IsChecked" Value="True"><Setter TargetName="Chip" Property="BorderBrush" Value="#55A884"/></Trigger>
+                                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chip" Property="Background" Value="{DynamicResource Hover}"/></Trigger>
+                                            <Trigger Property="IsChecked" Value="True"><Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource Focus}"/></Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
                                 </ToggleButton.Template>
@@ -119,7 +167,7 @@
                             <Popup x:Name="PART_Popup" Placement="Bottom" VerticalOffset="4" IsOpen="{TemplateBinding IsDropDownOpen}"
                                    AllowsTransparency="True" Focusable="False">
                                 <Border MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
-                                        Background="White" BorderBrush="#CADCD2" BorderThickness="1" CornerRadius="10" Padding="4">
+                                        Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="10" Padding="4">
                                     <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto"><ItemsPresenter/></ScrollViewer>
                                 </Border>
                             </Popup>
@@ -132,25 +180,40 @@
             </Setter>
         </Style>
         <DataTemplate x:Key="ServiceCard">
-            <Border Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="15" Padding="13,13,13,12">
+            <Border Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="15" Padding="13,13,13,12">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <Border Width="27" Height="27" CornerRadius="8" Background="#ECF5F0" Margin="0,0,8,0">
-                            <Path Data="{Binding Glyph}" Stroke="#267657" StrokeThickness="1.4" StrokeStartLineCap="Round"
+                        <Border Width="27" Height="27" CornerRadius="8" Background="{DynamicResource IconFill}" Margin="0,0,8,0">
+                            <Path Data="{Binding Glyph}" Stroke="{DynamicResource Positive}" StrokeThickness="1.4" StrokeStartLineCap="Round"
                                   StrokeEndLineCap="Round" StrokeLineJoin="Round" Width="16" Height="16" Stretch="Uniform"/>
                         </Border>
                         <TextBlock Text="{Binding Name}" VerticalAlignment="Center" FontSize="17" FontWeight="SemiBold"/>
                     </StackPanel>
-                    <Border Background="{Binding Fill}" HorizontalAlignment="Left" Padding="7,4" CornerRadius="6">
-                        <TextBlock Text="{Binding Status}" Foreground="{Binding Tone}" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                    <Border x:Name="ResultBackground" Background="{DynamicResource WaitingFill}" HorizontalAlignment="Left" Padding="7,4" CornerRadius="6">
+                        <TextBlock x:Name="ResultStatus" Text="{Binding Status}" Foreground="{DynamicResource Waiting}"
+                                   FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"/>
                     </Border>
-                    <TextBlock Text="{Binding Detail}" Foreground="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap"
+                    <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap"
                                Margin="0,8,0,0" MinHeight="32"/>
                 </StackPanel>
             </Border>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding State}" Value="Reachable">
+                    <Setter TargetName="ResultBackground" Property="Background" Value="{DynamicResource PositiveFill}"/>
+                    <Setter TargetName="ResultStatus" Property="Foreground" Value="{DynamicResource Positive}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding State}" Value="Restricted">
+                    <Setter TargetName="ResultBackground" Property="Background" Value="{DynamicResource CautionFill}"/>
+                    <Setter TargetName="ResultStatus" Property="Foreground" Value="{DynamicResource Caution}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding State}" Value="Unreachable">
+                    <Setter TargetName="ResultBackground" Property="Background" Value="{DynamicResource NegativeFill}"/>
+                    <Setter TargetName="ResultStatus" Property="Foreground" Value="{DynamicResource Negative}"/>
+                </DataTrigger>
+            </DataTemplate.Triggers>
         </DataTemplate>
     </Window.Resources>
-    <Grid x:Name="RootLayout" Background="#F0F5F2">
+    <Grid x:Name="RootLayout" Background="{DynamicResource Canvas}">
         <Grid Margin="26,21,26,20">
             <Grid.RowDefinitions>
                 <RowDefinition Height="57"/>
@@ -163,18 +226,21 @@
                     <Image Source="logo.png" Width="50" Height="50" Margin="0,0,12,0" RenderOptions.BitmapScalingMode="HighQuality"/>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="DNS-пульт" FontSize="25" FontWeight="Bold" Margin="0,-3,0,0"/>
-                        <TextBlock Text="DNS-over-HTTPS" Foreground="{StaticResource Muted}" FontSize="13"/>
+                        <TextBlock Text="DNS-over-HTTPS" Foreground="{DynamicResource Muted}" FontSize="13"/>
                     </StackPanel>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="Сетевой адаптер" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                    <ComboBox x:Name="AdapterPicker" Style="{StaticResource AdapterCombo}" DisplayMemberPath="Name"
+                    <TextBlock Text="Сетевой адаптер" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <ComboBox x:Name="AdapterPicker" Style="{StaticResource Picker}" DisplayMemberPath="Name"
                               AutomationProperties.Name="Сетевой адаптер" SelectionChanged="AdapterChanged"/>
+                    <TextBlock Text="Тема" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" Margin="17,0,9,0"/>
+                    <ComboBox x:Name="ThemePicker" Style="{StaticResource Picker}" DisplayMemberPath="Name" MinWidth="139"
+                              AutomationProperties.Name="Тема оформления" SelectionChanged="ThemeChanged"/>
                 </StackPanel>
             </Grid>
             <Grid Grid.Row="2">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="270"/><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <Border Background="White" CornerRadius="20" BorderBrush="{StaticResource Line}" BorderThickness="1" Padding="13,14,13,12">
+                <Border Background="{DynamicResource Surface}" CornerRadius="20" BorderBrush="{DynamicResource Line}" BorderThickness="1" Padding="13,14,13,12">
                     <Grid>
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                         <Grid Margin="6,0,4,8">
@@ -184,27 +250,39 @@
                                     Width="34" MinHeight="34" Padding="0" ToolTip="Проверить DNS и сервисы"
                                     AutomationProperties.Name="Проверить DNS и сервисы" Click="RefreshClicked">
                                 <Path Data="M 14 6 A 5 5 0 1 0 14 12 M 14 2 L 14 6 L 10 6"
-                                      Stroke="{StaticResource Positive}" StrokeThickness="1.55"
+                                      Stroke="{DynamicResource Positive}" StrokeThickness="1.55"
                                       StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
                             </Button>
                         </Grid>
-                        <TextBlock Grid.Row="1" Text="Сервер" Foreground="{StaticResource Muted}" FontSize="12" Margin="7,0,8,6"/>
-                        <TextBlock Grid.Row="1" Text="Отклик DNS" Foreground="{StaticResource Muted}" FontSize="12" HorizontalAlignment="Right" Margin="0,0,10,6"/>
+                        <TextBlock Grid.Row="1" Text="Сервер" Foreground="{DynamicResource Muted}" FontSize="12" Margin="7,0,8,6"/>
+                        <TextBlock Grid.Row="1" Text="Отклик DNS" Foreground="{DynamicResource Muted}" FontSize="12" HorizontalAlignment="Right" Margin="0,0,10,6"/>
                         <ListBox x:Name="ProfileList" Grid.Row="2" Background="Transparent" BorderThickness="0" Padding="0"
                                  ItemContainerStyle="{StaticResource ProfileItem}" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
                                  AutomationProperties.Name="DNS-профили" SelectionChanged="ProfileChanged">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                        <Ellipse Width="8" Height="8" Fill="{Binding Tone}" Margin="0,0,9,0" VerticalAlignment="Center"/>
+                                        <Ellipse x:Name="ProfileDot" Width="8" Height="8" Fill="{DynamicResource Waiting}"
+                                                 Margin="0,0,9,0" VerticalAlignment="Center"/>
                                         <StackPanel Grid.Column="1">
                                             <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"/>
-                                            <TextBlock Text="{Binding Host}" FontSize="12" Foreground="{StaticResource Muted}" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding Host}" FontSize="12" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis"/>
                                         </StackPanel>
-                                        <TextBlock Grid.Column="2" Text="{Binding Status}" VerticalAlignment="Center" FontSize="12"
-                                                   Foreground="{Binding Tone}" Margin="6,0,0,0"/>
+                                        <TextBlock x:Name="ProfileStatus" Grid.Column="2" Text="{Binding Status}" VerticalAlignment="Center" FontSize="12"
+                                                   Foreground="{DynamicResource Waiting}" Margin="6,0,0,0"/>
                                     </Grid>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding State}" Value="Reachable">
+                                            <Setter TargetName="ProfileDot" Property="Fill" Value="{DynamicResource Positive}"/>
+                                            <Setter TargetName="ProfileStatus" Property="Foreground" Value="{DynamicResource Positive}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding State}" Value="Unreachable">
+                                            <Setter TargetName="ProfileDot" Property="Fill" Value="{DynamicResource Negative}"/>
+                                            <Setter TargetName="ProfileStatus" Property="Foreground" Value="{DynamicResource Negative}"/>
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
@@ -212,26 +290,20 @@
                 </Border>
                 <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel>
-                        <Border Padding="23,18,23,19" CornerRadius="21" ClipToBounds="True">
-                            <Border.Background>
-                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                    <GradientStop Color="#122E2A" Offset="0"/>
-                                    <GradientStop Color="#1B493E" Offset="1"/>
-                                </LinearGradientBrush>
-                            </Border.Background>
+                        <Border Padding="23,18,23,19" CornerRadius="21" ClipToBounds="True" Background="{DynamicResource HeroSurface}">
                             <Grid>
                                 <Canvas Width="167" Height="110" HorizontalAlignment="Right" VerticalAlignment="Center"
                                         Margin="0,0,-4,0" Opacity=".24" IsHitTestVisible="False">
                                     <Path Data="M 7 88 H 47 Q 54 88 61 76 L 106 19 Q 112 12 121 12 H 158 M 38 29 H 61 Q 66 29 76 41 L 109 80 Q 116 88 123 88 H 158"
-                                          Stroke="#9CF2CC" StrokeThickness="2.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-                                    <Ellipse Canvas.Left="2" Canvas.Top="83" Width="10" Height="10" Fill="#9CF2CC"/>
-                                    <Ellipse Canvas.Left="153" Canvas.Top="7" Width="10" Height="10" Fill="#9CF2CC"/>
-                                    <Ellipse Canvas.Left="34" Canvas.Top="25" Width="8" Height="8" Fill="#9CF2CC"/>
-                                    <Ellipse Canvas.Left="154" Canvas.Top="84" Width="8" Height="8" Fill="#9CF2CC"/>
+                                          Stroke="{DynamicResource HeroTrace}" StrokeThickness="2.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                    <Ellipse Canvas.Left="2" Canvas.Top="83" Width="10" Height="10" Fill="{DynamicResource HeroTrace}"/>
+                                    <Ellipse Canvas.Left="153" Canvas.Top="7" Width="10" Height="10" Fill="{DynamicResource HeroTrace}"/>
+                                    <Ellipse Canvas.Left="34" Canvas.Top="25" Width="8" Height="8" Fill="{DynamicResource HeroTrace}"/>
+                                    <Ellipse Canvas.Left="154" Canvas.Top="84" Width="8" Height="8" Fill="{DynamicResource HeroTrace}"/>
                                 </Canvas>
                                 <StackPanel>
-                                    <TextBlock x:Name="ProfileTitle" Text="MagicDNS" FontSize="34" FontWeight="Bold" Foreground="#F1FFF9"/>
-                                    <TextBlock x:Name="ProfileHost" Text="dns.magicdns.ru" FontSize="14" Foreground="#C7E4D7" Margin="0,0,0,15"/>
+                                    <TextBlock x:Name="ProfileTitle" Text="MagicDNS" FontSize="34" FontWeight="Bold" Foreground="{DynamicResource HeroInk}"/>
+                                    <TextBlock x:Name="ProfileHost" Text="dns.magicdns.ru" FontSize="14" Foreground="{DynamicResource HeroMuted}" Margin="0,0,0,15"/>
                                     <WrapPanel>
                                         <Button x:Name="ApplyButton" Style="{StaticResource PrimaryButton}" Content="Применить DNS" Click="ApplyClicked" Margin="0,0,8,0"/>
                                         <Button x:Name="AutoButton" Style="{StaticResource HeroButton}" Content="Авто" Click="AutoClicked"
@@ -242,23 +314,26 @@
                         </Border>
                         <TextBlock Text="Доступ к сервисам" FontSize="21" FontWeight="SemiBold" Margin="0,17,0,8"/>
                         <Grid>
-                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="10"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition/>
+                            </Grid.ColumnDefinitions>
                             <ContentControl x:Name="ChatCard" ContentTemplate="{StaticResource ServiceCard}"/>
                             <ContentControl x:Name="GeminiCard" Grid.Column="2" ContentTemplate="{StaticResource ServiceCard}"/>
+                            <ContentControl x:Name="ClaudeCard" Grid.Column="4" ContentTemplate="{StaticResource ServiceCard}"/>
                         </Grid>
-                        <TextBlock Text="Проверка сайта по HTTPS без входа в аккаунт." Foreground="{StaticResource Muted}" FontSize="12" Margin="1,9,0,0"/>
-                        <Border CornerRadius="15" Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1" Padding="14,11" Margin="0,15,0,0">
+                        <TextBlock Text="Проверка сайта по HTTPS без входа в аккаунт." Foreground="{DynamicResource Muted}" FontSize="12" Margin="1,9,0,0"/>
+                        <Border CornerRadius="15" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1" Padding="14,11" Margin="0,15,0,0">
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                 <StackPanel Margin="0,0,10,0">
                                     <TextBlock Text="DNS адаптера" FontWeight="SemiBold" FontSize="14"/>
-                                    <TextBlock x:Name="SystemDns" Foreground="{StaticResource Muted}" FontSize="13" TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="SystemDns" Foreground="{DynamicResource Muted}" FontSize="13" TextWrapping="Wrap"/>
                                 </StackPanel>
                                 <Button x:Name="RestoreButton" Grid.Column="1" Style="{StaticResource ButtonBase}" Content="Вернуть исходный DNS"
                                         Click="RestoreClicked" VerticalAlignment="Center"/>
                             </Grid>
                         </Border>
-                        <TextBlock x:Name="ActionStatus" Foreground="{StaticResource Positive}" FontSize="13" TextWrapping="Wrap" Margin="1,8,0,0"
+                        <TextBlock x:Name="ActionStatus" Foreground="{DynamicResource Positive}" FontSize="13" TextWrapping="Wrap" Margin="1,8,0,0"
                                    AutomationProperties.LiveSetting="Polite"/>
                     </StackPanel>
                 </ScrollViewer>

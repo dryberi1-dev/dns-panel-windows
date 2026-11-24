@@ -16,25 +16,47 @@ internal partial class MainForm : Window
     private readonly CancellationTokenSource _lifetime = new();
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMinutes(1) };
     private readonly ProfileRow[] _rows;
+    private readonly (ContentControl Card, WebService Service)[] _serviceCards;
     private CancellationTokenSource? _refresh;
     private CancellationTokenSource? _serviceCheck;
     private Task<Reading>[]? _readings;
     private bool _ready;
     private bool _working;
     private bool _loadingAdapters;
+    private ThemeChoice _theme;
+    private bool? _dark;
+    private HwndSource? _windowSource;
+
+    private static readonly ThemeOption[] Themes =
+    [
+        new(ThemeChoice.System, "Как в системе"),
+        new(ThemeChoice.Light, "Светлая"),
+        new(ThemeChoice.Dark, "Тёмная")
+    ];
 
     public MainForm()
     {
         InitializeComponent();
-        _rows = DnsProfiles.All.Select(profile => new ProfileRow(profile, Brush("Waiting"))).ToArray();
+        _theme = Appearance.ReadChoice();
+        ThemePicker.ItemsSource = Themes;
+        ThemePicker.SelectedItem = Themes.Single(option => option.Choice == _theme);
+        UpdateTheme();
+        _rows = DnsProfiles.All.Select(profile => new ProfileRow(profile)).ToArray();
         ProfileList.ItemsSource = _rows;
         ProfileList.SelectedIndex = 1;
-        ShowService(ChatCard, ServiceProbe.ChatGpt, Waiting("Ожидание", "Проверка начнётся после запуска."));
-        ShowService(GeminiCard, ServiceProbe.Gemini, Waiting("Ожидание", "Проверка начнётся после запуска."));
+        _serviceCards =
+        [
+            (ChatCard, ServiceProbe.ChatGpt),
+            (GeminiCard, ServiceProbe.Gemini),
+            (ClaudeCard, ServiceProbe.Claude)
+        ];
+        foreach (var (card, service) in _serviceCards)
+            ShowService(card, service, Waiting("Ожидание", "Проверка начнётся после запуска."));
         SourceInitialized += (_, _) =>
         {
-            var caption = 0x00F2F5F0;
-            DwmSetWindowAttribute(new WindowInteropHelper(this).Handle, 35, ref caption, sizeof(int));
+            _windowSource = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
+            _windowSource?.AddHook(ThemeMessage);
+            UpdateCaption();
         };
         Loaded += async (_, _) =>
         {
@@ -45,12 +67,16 @@ internal partial class MainForm : Window
         };
         _timer.Tick += async (_, _) =>
         {
+            if (_theme == ThemeChoice.System)
+                UpdateTheme();
             if (!_working && _refresh is null)
                 await RefreshAsync();
         };
         Closed += (_, _) =>
         {
             _timer.Stop();
+            if (_windowSource is { IsDisposed: false })
+                _windowSource.RemoveHook(ThemeMessage);
             _lifetime.Cancel();
         };
     }
@@ -92,7 +118,7 @@ internal partial class MainForm : Window
         try
         {
             foreach (var row in _rows)
-                row.Set(connected ? "Проверка…" : "Нет сети", Brush("Waiting"));
+                row.Set(connected ? "Проверка…" : "Нет сети", ServiceState.Waiting);
             _readings = connected
                 ? DnsProfiles.All.Select(profile => DnsProfiles.Check(profile, refresh.Token, adapter)).ToArray()
                 : null;
@@ -123,9 +149,9 @@ internal partial class MainForm : Window
         var reading = await pending;
         token.ThrowIfCancellationRequested();
         if (reading.Milliseconds is long milliseconds)
-            row.Set($"{milliseconds} мс", Brush("Positive"));
+            row.Set($"{milliseconds} мс", ServiceState.Reachable);
         else
-            row.Set(reading.Status, Brush("Negative"));
+            row.Set(reading.Status, ServiceState.Unreachable);
     }
 
     private async Task InspectServicesAsync()
@@ -144,8 +170,8 @@ internal partial class MainForm : Window
         var status = pending is null
             ? Waiting("Нет сети", "Подключите сетевой адаптер для проверки.")
             : Waiting("Проверка…", $"Проверяем сайт через {row.Name}.");
-        ShowService(ChatCard, ServiceProbe.ChatGpt, status);
-        ShowService(GeminiCard, ServiceProbe.Gemini, status);
+        foreach (var (card, service) in _serviceCards)
+            ShowService(card, service, status);
 
         try
         {
@@ -153,9 +179,8 @@ internal partial class MainForm : Window
             {
                 await Task.Delay(120, check.Token);
                 var reading = await pending.WaitAsync(check.Token);
-                await Task.WhenAll(
-                    CheckCardAsync(ChatCard, ServiceProbe.ChatGpt, reading, adapter, check.Token),
-                    CheckCardAsync(GeminiCard, ServiceProbe.Gemini, reading, adapter, check.Token));
+                await Task.WhenAll(_serviceCards.Select(item =>
+                    CheckCardAsync(item.Card, item.Service, reading, adapter, check.Token)));
             }
         }
         catch (OperationCanceledException)
@@ -178,18 +203,13 @@ internal partial class MainForm : Window
 
     private void ShowService(ContentControl card, WebService service, ServiceResult result)
     {
-        var color = result.State switch
+        var glyph = service.Name switch
         {
-            ServiceState.Reachable => "Positive",
-            ServiceState.Restricted => "Caution",
-            ServiceState.Unreachable => "Negative",
-            _ => "Waiting"
+            "ChatGPT" => "M2,3 H14 V12 H7 L3,15 V12 H2 Z M5,7 H11",
+            "Gemini" => "M8,1 C8,5 11,8 15,8 C11,8 8,11 8,15 C8,11 5,8 1,8 C5,8 8,5 8,1 Z",
+            _ => "M8,1 V15 M1,8 H15 M3,3 L13,13 M3,13 L13,3"
         };
-        var glyph = service == ServiceProbe.ChatGpt
-            ? "M2,3 H14 V12 H7 L3,15 V12 H2 Z M5,7 H11"
-            : "M8,1 C8,5 11,8 15,8 C11,8 8,11 8,15 C8,11 5,8 1,8 C5,8 8,5 8,1 Z";
-        card.Content = new ServiceCardData(service.Name, Geometry.Parse(glyph), result.Status, result.Detail,
-            Brush(color), Brush(color + "Fill"));
+        card.Content = new ServiceCardData(service.Name, Geometry.Parse(glyph), result.Status, result.Detail, result.State);
     }
 
     private async Task ChangeAsync(bool restore, Profile? profile = null)
@@ -274,7 +294,7 @@ internal partial class MainForm : Window
     private void SetAction(string text, string color = "Muted")
     {
         ActionStatus.Text = text;
-        ActionStatus.Foreground = Brush(color);
+        ActionStatus.SetResourceReference(TextBlock.ForegroundProperty, color);
     }
 
     private async void RefreshClicked(object sender, RoutedEventArgs e) => await RefreshAsync();
@@ -295,30 +315,73 @@ internal partial class MainForm : Window
         }
     }
 
-    private Brush Brush(string key) => (Brush)FindResource(key);
+    private void ThemeChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ThemePicker.SelectedItem is not ThemeOption option || option.Choice == _theme)
+            return;
+        _theme = option.Choice;
+        UpdateTheme();
+        if (!Appearance.TrySave(_theme))
+            SetAction("Тема применена. Windows не разрешила сохранить выбор.", "Negative");
+    }
+
+    private void UpdateTheme()
+    {
+        var dark = Appearance.IsDark(_theme);
+        if (_dark == dark)
+            return;
+        _dark = dark;
+        Appearance.SetColors(Resources, dark);
+        UpdateCaption();
+    }
+
+    private IntPtr ThemeMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        const int settingsChanged = 0x001A;
+        const int themeChanged = 0x031A;
+        if (_theme == ThemeChoice.System && message is settingsChanged or themeChanged)
+            UpdateTheme();
+        return IntPtr.Zero;
+    }
+
+    private void UpdateCaption()
+    {
+        if (_windowSource is not { IsDisposed: false } source)
+            return;
+        var dark = _dark == true ? 1 : 0;
+        var caption = ToColorRef(((SolidColorBrush)Resources["Canvas"]).Color);
+        var ink = ToColorRef(((SolidColorBrush)Resources["Ink"]).Color);
+        DwmSetWindowAttribute(source.Handle, 20, ref dark, sizeof(int));
+        DwmSetWindowAttribute(source.Handle, 35, ref caption, sizeof(int));
+        DwmSetWindowAttribute(source.Handle, 36, ref ink, sizeof(int));
+    }
+
+    private static int ToColorRef(Color color) => color.R | color.G << 8 | color.B << 16;
 
     private static ServiceResult Waiting(string status, string detail) => new(ServiceState.Waiting, status, detail);
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr handle, int attribute, ref int value, int size);
 
-    private sealed record ServiceCardData(string Name, Geometry Glyph, string Status, string Detail, Brush Tone, Brush Fill);
+    private sealed record ThemeOption(ThemeChoice Choice, string Name);
 
-    private sealed class ProfileRow(Profile profile, Brush tone) : INotifyPropertyChanged
+    private sealed record ServiceCardData(string Name, Geometry Glyph, string Status, string Detail, ServiceState State);
+
+    private sealed class ProfileRow(Profile profile) : INotifyPropertyChanged
     {
         public Profile Profile { get; } = profile;
         public string Name => Profile.Name;
         public string Host => Profile.Host;
         public string Status { get; private set; } = "Ожидание";
-        public Brush Tone { get; private set; } = tone;
+        public ServiceState State { get; private set; } = ServiceState.Waiting;
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        public void Set(string status, Brush brush)
+        public void Set(string status, ServiceState state)
         {
             Status = status;
-            Tone = brush;
+            State = state;
             PropertyChanged?.Invoke(this, new(nameof(Status)));
-            PropertyChanged?.Invoke(this, new(nameof(Tone)));
+            PropertyChanged?.Invoke(this, new(nameof(State)));
         }
     }
 }

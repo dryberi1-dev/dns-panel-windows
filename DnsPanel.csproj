@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>DNS-Panel-Windows</AssemblyName>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <ApplicationIcon>DnsPanel.ico</ApplicationIcon>
     <Description>DNS-пульт для Windows</Description>
   </PropertyGroup>

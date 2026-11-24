@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -15,11 +16,11 @@ internal partial class MainForm : Window
 {
     private readonly CancellationTokenSource _lifetime = new();
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMinutes(1) };
-    private readonly ProfileRow[] _rows;
+    private readonly ObservableCollection<ProfileRow> _rows;
     private readonly (ContentControl Card, WebService Service)[] _serviceCards;
     private CancellationTokenSource? _refresh;
     private CancellationTokenSource? _serviceCheck;
-    private Task<Reading>[]? _readings;
+    private Dictionary<Profile, Task<Reading>>? _readings;
     private bool _ready;
     private bool _working;
     private bool _loadingAdapters;
@@ -41,9 +42,9 @@ internal partial class MainForm : Window
         ThemePicker.ItemsSource = Themes;
         ThemePicker.SelectedItem = Themes.Single(option => option.Choice == _theme);
         UpdateTheme();
-        _rows = DnsProfiles.All.Select(profile => new ProfileRow(profile)).ToArray();
+        _rows = new ObservableCollection<ProfileRow>(DnsProfiles.All.Select(profile => new ProfileRow(profile)));
         ProfileList.ItemsSource = _rows;
-        ProfileList.SelectedIndex = 1;
+        ProfileList.SelectedItem = _rows[1];
         _serviceCards =
         [
             (ChatCard, ServiceProbe.ChatGpt),
@@ -119,16 +120,16 @@ internal partial class MainForm : Window
         {
             foreach (var row in _rows)
                 row.Set(connected ? "Проверка…" : "Нет сети", ServiceState.Waiting);
-            _readings = connected
-                ? DnsProfiles.All.Select(profile => DnsProfiles.Check(profile, refresh.Token, adapter)).ToArray()
+            var readings = connected
+                ? _rows.ToDictionary(row => row.Profile, row => DnsProfiles.Check(row.Profile, refresh.Token, adapter))
                 : null;
-            if (_readings is null)
+            _readings = readings;
+            if (readings is null)
             {
                 await InspectServicesAsync();
                 return;
             }
-            var paint = _readings.Select((reading, index) => PaintAsync(reading, _rows[index], refresh.Token));
-            await Task.WhenAll(paint.Append(InspectServicesAsync()));
+            await Task.WhenAll(RefreshOrderAsync(readings, refresh.Token), InspectServicesAsync());
         }
         catch (OperationCanceledException) when (refresh.IsCancellationRequested)
         {
@@ -144,12 +145,25 @@ internal partial class MainForm : Window
         }
     }
 
+    private async Task RefreshOrderAsync(Dictionary<Profile, Task<Reading>> readings, CancellationToken token)
+    {
+        await Task.WhenAll(_rows.Select(row => PaintAsync(readings[row.Profile], row, token)));
+        token.ThrowIfCancellationRequested();
+        var sorted = _rows.OrderBy(row => !row.Milliseconds.HasValue).ThenBy(row => row.Milliseconds).ToArray();
+        for (var index = 0; index < sorted.Length; index++)
+        {
+            var oldIndex = _rows.IndexOf(sorted[index]);
+            if (oldIndex != index)
+                _rows.Move(oldIndex, index);
+        }
+    }
+
     private async Task PaintAsync(Task<Reading> pending, ProfileRow row, CancellationToken token)
     {
         var reading = await pending;
         token.ThrowIfCancellationRequested();
         if (reading.Milliseconds is long milliseconds)
-            row.Set($"{milliseconds} мс", ServiceState.Reachable);
+            row.Set($"{milliseconds} мс", ServiceState.Reachable, milliseconds);
         else
             row.Set(reading.Status, ServiceState.Unreachable);
     }
@@ -165,8 +179,7 @@ internal partial class MainForm : Window
         using var check = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         _serviceCheck = check;
         var adapter = SelectedAdapter;
-        var index = ProfileList.SelectedIndex;
-        var pending = _readings?[index];
+        var pending = _readings?.GetValueOrDefault(row.Profile);
         var status = pending is null
             ? Waiting("Нет сети", "Подключите сетевой адаптер для проверки.")
             : Waiting("Проверка…", $"Проверяем сайт через {row.Name}.");
@@ -233,7 +246,7 @@ internal partial class MainForm : Window
                     return;
                 }
                 profile = selected.Profile;
-                ProfileList.SelectedIndex = Array.IndexOf(DnsProfiles.All, profile);
+                ProfileList.SelectedItem = _rows.First(row => row.Profile == profile);
                 SetAction($"{profile.Name} · подтвердите изменение DNS в окне Windows.");
             }
             else
@@ -374,12 +387,14 @@ internal partial class MainForm : Window
         public string Host => Profile.Host;
         public string Status { get; private set; } = "Ожидание";
         public ServiceState State { get; private set; } = ServiceState.Waiting;
+        public long? Milliseconds { get; private set; }
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        public void Set(string status, ServiceState state)
+        public void Set(string status, ServiceState state, long? milliseconds = null)
         {
             Status = status;
             State = state;
+            Milliseconds = milliseconds;
             PropertyChanged?.Invoke(this, new(nameof(Status)));
             PropertyChanged?.Invoke(this, new(nameof(State)));
         }
